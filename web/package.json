@@ -1,0 +1,110 @@
+import cors from 'cors';
+import express from 'express';
+import {
+  acceptRide,
+  createRide,
+  drivers,
+  getDashboardSummary,
+  rides,
+  updateDriverStatus,
+  updateRideStatus,
+} from './data.js';
+
+const app = express();
+const PORT = 3001;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, service: 'Sherxan Taxi API', time: new Date().toISOString() });
+});
+
+app.get('/api/dashboard', (_req, res) => {
+  res.json(getDashboardSummary());
+});
+
+app.get('/api/drivers', (_req, res) => {
+  res.json(drivers);
+});
+
+app.post('/api/drivers/:id/status', (req, res) => {
+  const { online } = req.body as { online?: boolean };
+  const driver = updateDriverStatus(req.params.id, Boolean(online));
+
+  if (!driver) {
+    res.status(404).json({ message: 'Driver not found' });
+    return;
+  }
+
+  res.json(driver);
+});
+
+app.get('/api/rides', (_req, res) => {
+  res.json(rides);
+});
+
+app.post('/api/rides/request', (req, res) => {
+  const body = req.body as {
+    clientName?: string;
+    pickupAddress?: string;
+    pickupLat?: number;
+    pickupLng?: number;
+    destinationAddress?: string;
+    destinationLat?: number;
+    destinationLng?: number;
+  };
+
+  if (!body.clientName || !body.pickupAddress || !body.destinationAddress) {
+    res.status(400).json({ message: 'Missing required ride data' });
+    return;
+  }
+
+  const ride = createRide({
+    clientName: body.clientName,
+    pickupAddress: body.pickupAddress,
+    pickupLat: Number(body.pickupLat ?? 41.33),
+    pickupLng: Number(body.pickupLng ?? 69.28),
+    destinationAddress: body.destinationAddress,
+    destinationLat: Number(body.destinationLat ?? 41.29),
+    destinationLng: Number(body.destinationLng ?? 69.20),
+  });
+
+  res.status(201).json(ride);
+});
+
+app.post('/api/rides/:id/accept', (req, res) => {
+  const { driverId } = req.body as { driverId?: string };
+  if (!driverId) {
+    res.status(400).json({ message: 'Driver ID is required' });
+    return;
+  }
+
+  const ride = acceptRide(req.params.id, driverId);
+  if (!ride) {
+    res.status(404).json({ message: 'Ride or driver not found' });
+    return;
+  }
+
+  res.json(ride);
+});
+
+app.post('/api/rides/:id/status', (req, res) => {
+  const { status } = req.body as { status?: string };
+  if (!status) {
+    res.status(400).json({ message: 'Status is required' });
+    return;
+  }
+
+  const ride = updateRideStatus(req.params.id, status as any);
+  if (!ride) {
+    res.status(404).json({ message: 'Ride not found' });
+    return;
+  }
+
+  res.json(ride);
+});
+
+app.listen(PORT, () => {
+  console.log(`Sherxan Taxi API is running on http://localhost:${PORT}`);
+});
